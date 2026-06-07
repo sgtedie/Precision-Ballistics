@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precision Ballistics</title>
+<style>
+  :root {
+    --bg: #e8eaed;
+    --surface: #f4f5f7;
+    --surface2: #ecedf0;
+    --border: #d0d3da;
+    --border-accent: #c0c4ce;
+    --accent: #e84c0a;
+    --accent2: #ff6a28;
+    --accent-dim: #c43d06;
+    --text: #0f1117;
+    --text-muted: #5c6070;
+    --red: #dc2626;
+    --green: #16a34a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* Subtle grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .app { position: relative; z-index: 1; }
+
+  /* Layout */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+  header {
+    background: #0f1117;
+    border-bottom: 3px solid var(--accent);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+  }
+  header h1 { font-size: 18px; font-weight: 900; letter-spacing: 3px; color: #fff; }
+  header h1 span { color: var(--accent); }
+  header > span { color: #6b7280; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; border-left: 1px solid #2e3247; padding-left: 16px; margin-left: 4px; }
+  .tab-bar { display: flex; background: #1a1d27; border-bottom: 1px solid #2e3247; padding: 0 20px; }
+  .tab { padding: 13px 20px; font-size: 12px; font-weight: 700; color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.15s; white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: #c0c4ce; }
+  .content { flex: 1; padding: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  }
+  .card-title {
+    font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 700px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Form fields */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .field input, .field select {
+    background: #fff;
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(232,76,10,0.12);
+  }
+  .field select option { background: #fff; color: #111; }
+  .field .unit { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+  /* Buttons */
+  .btn { padding: 10px 22px; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; border: none; transition: all 0.15s; letter-spacing: 1px; text-transform: uppercase; }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(232,76,10,0.3);
+  }
+  .btn-primary:hover {
+    background: var(--accent2);
+    box-shadow: 0 4px 16px rgba(232,76,10,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-secondary { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--red); border: 1.5px solid var(--red); }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-sm { padding: 6px 12px; font-size: 11px; }
+
+  /* Results table */
+  .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .results-table thead { background: #0f1117; }
+  .results-table th { text-align: right; padding: 10px 12px; color: #9ca3af; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; }
+  .results-table th:first-child { text-align: left; color: var(--accent); }
+  .results-table td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; font-weight: 500; }
+  .results-table td:first-child { text-align: left; font-weight: 800; color: #0f1117; }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr:hover td { background: #ecedf0; }
+  .results-table .zero-row td { background: #f0fdf4; color: var(--green); font-weight: 700; }
+  .results-table .negative { color: var(--red); font-weight: 700; }
+
+  /* Load library */
+  .load-list { display: flex; flex-direction: column; gap: 8px; }
+  .load-item { background: #fff; border: 1.5px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.15s; }
+  .load-item:hover { border-left-color: var(--accent); background: #fafafa; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .load-item.active { border-left-color: var(--accent); background: #fff5f0; }
+  .load-item .load-name { font-weight: 700; font-size: 14px; flex: 1; }
+  .load-item .load-meta { font-size: 12px; color: var(--text-muted); }
+
+  /* Range card */
+  .range-card { background: #fff; color: #111; border-radius: var(--radius); padding: 24px; font-family: 'Courier New', monospace; }
+  .range-card h2 { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
+  .range-card .rc-meta { font-size: 11px; color: #555; margin-bottom: 16px; }
+  .range-card table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .range-card th { background: #222; color: #fff; padding: 5px 8px; text-align: right; font-size: 10px; }
+  .range-card th:first-child { text-align: left; }
+  .range-card td { padding: 4px 8px; text-align: right; border-bottom: 1px solid #ddd; }
+  .range-card td:first-child { text-align: left; font-weight: 700; }
+  .range-card tr:nth-child(even) td { background: #f5f5f5; }
+
+  /* Tabs content */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Unit toggle */
+  .unit-toggle { display: flex; gap: 4px; background: var(--bg); border-radius: 6px; padding: 3px; border: 1px solid var(--border); }
+  .unit-toggle button { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s; }
+  .unit-toggle button.active { background: var(--accent); color: #111; }
+
+  /* Summary chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chip { background: #fff; border: 1.5px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .chip span { color: var(--accent); font-weight: 800; }
+
+  /* Misc */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .empty-state { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .tip { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .actions-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 800; background: var(--accent); color: #fff; letter-spacing: 0.5px; text-transform: uppercase; }
+  /* hr moved to empty-state block above */
+  .two-col { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+  .print-btn { display: none; }
+  @media print {
+    body { background: white; }
+    .app > *:not(.range-card-wrapper) { display: none !important; }
+    .print-btn { display: none !important; }
+    .range-card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      <circle cx="15" cy="15" r="14" stroke="#e84c0a" stroke-width="1.5"/>
+      <circle cx="15" cy="15" r="5" fill="#e84c0a"/>
+      <circle cx="15" cy="15" r="9" stroke="#e84c0a" stroke-width="0.75" stroke-dasharray="2 2"/>
+      <line x1="15" y1="1" x2="15" y2="6" stroke="#e84c0a" stroke-width="2"/>
+      <line x1="15" y1="24" x2="15" y2="29" stroke="#e84c0a" stroke-width="2"/>
+      <line x1="1" y1="15" x2="6" y2="15" stroke="#e84c0a" stroke-width="2"/>
+      <line x1="24" y1="15" x2="29" y2="15" stroke="#e84c0a" stroke-width="2"/>
+    </svg>
+    <h1>PRECISION <span>BALLISTICS</span></h1>
+    <span>Long Range Calculator</span>
+  </header>
+
+  <div class="tab-bar">
+    <div class="tab active" onclick="showTab('calc')">Calculator</div>
+    <div class="tab" onclick="showTab('loads')">Load Library</div>
+    <div class="tab" onclick="showTab('rangecard')">Range Card</div>
+    <div class="tab" onclick="showTab('environment')">Environment</div>
+  </div>
+
+  <!-- CALCULATOR TAB -->
+  <div id="tab-calc" class="tab-content active content">
+    <div class="two-col">
+      <div>
+        <!-- Load selector -->
+        <div class="card">
+          <div class="section-header">
+            <div class="card-title">Active Load</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="active-load-badge" class="badge" style="display:none"></span>
+              <button class="btn btn-secondary btn-sm" onclick="showTab('loads')">Library</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Bullet Weight</label>
+              <input type="number" id="bulletWeight" value="175" min="1" max="1000">
+              <span class="unit">grains</span>
+            </div>
+            <div class="field">
+              <label>Muzzle Velocity</label>
+              <input type="number" id="muzzleVelocity" value="2600" min="100" max="5000">
+              <span class="unit">fps</span>
+            </div>
+            <div class="field">
+              <label>BC Type</label>
+              <select id="bcType">
+                <option value="G1">G1 (Traditional)</option>
+                <option value="G7" selected>G7 (Long Range)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Ballistic Coefficient</label>
+              <input type="number" id="bc" value="0.301" step="0.001" min="0.01" max="1.5">
+              <span class="unit">G7 BC</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rifle setup -->
+        <div class="card">
+          <div class="card-title">Rifle Setup</div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Scope Height</label>
+              <input type="number" id="scopeHeight" value="1.5" step="0.1" min="0.5" max="4">
+              <span class="unit">inches above bore</span>
+            </div>
+            <div class="field">
+              <label>Zero Range</label>
+              <input type="number" id="zeroRange" value="100" min="25" max="500">
+              <span class="unit">yards</span>
+            </div>
+            <div class="field">
+              <label>Twist Rate</label>
+              <input type="number" id="twistRate" value="10" step="0.5" min="5" max="20">
+              <span class="unit">1:X inches</span>
+            </div>
+            <div class="field">
+              <label>Barrel Length</label>
+              <input type="number" id="barrelLength" value="24" step="1" min="10" max="36">
+              <span class="unit">inches</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target & Display -->
+        <div class="card">
+          <div class="card-title">Output Settings</div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Max Range</label>
+              <input type="number" id="maxRange" value="1000" min="100" max="3000" step="100">
+              <span class="unit">yards</span>
+            </div>
+            <div class="field">
+              <label>Step Every</label>
+              <select id="rangeStep">
+                <option value="25">25 yards</option>
+                <option value="50" selected>50 yards</option>
+                <option value="100">100 yards</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Drop Units</label>
+              <select id="dropUnits">
+                <option value="inches">Inches</option>
+                <option value="moa" selected>MOA</option>
+                <option value="mil">Mil (mRad)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Wind Units</label>
+              <select id="windUnits">
+                <option value="inches">Inches</option>
+                <option value="moa">MOA</option>
+                <option value="mil" selected>Mil (mRad)</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" onclick="calculate()">Calculate Trajectory</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div>
+        <div class="card" id="results-card" style="display:none">
+          <div class="section-header">
+            <div class="card-title">Trajectory Results</div>
+            <button class="btn btn-secondary btn-sm" onclick="showTab('rangecard')">→ Range Card</button>
+          </div>
+          <div class="chips" id="summary-chips"></div>
+          <div style="overflow-x:auto">
+            <table class="results-table" id="results-table">
+              <thead>
+                <tr>
+                  <th>Range</th>
+                  <th>Drop</th>
+                  <th>Wind</th>
+                  <th>Velocity</th>
+                  <th>Energy</th>
+                  <th>TOF</th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" id="no-results-card">
+          <div class="empty-state">
+            <div style="font-size:40px;margin-bottom:12px">🎯</div>
+            <div style="font-weight:700;margin-bottom:6px">Enter your load data and calculate</div>
+            <div>Results will appear here</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD LIBRARY TAB -->
+  <div id="tab-loads" class="tab-content content">
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <div class="section-header">
+            <div class="card-title">Save Current Load</div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Load Name</label>
+            <input type="text" id="loadName" placeholder="e.g. 6.5 Creedmoor 140gr Berger">
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Caliber / Notes</label>
+            <input type="text" id="loadNotes" placeholder="e.g. 6.5 Creedmoor, 2.8 OAL">
+          </div>
+          <button class="btn btn-primary" onclick="saveLoad()">Save Load</button>
+        </div>
+
+        <!-- Popular presets -->
+        <div class="card">
+          <div class="card-title">Quick Presets</div>
+          <div class="load-list" id="preset-list"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="section-header">
+            <div class="card-title">Saved Loads</div>
+            <span id="load-count" class="badge" style="display:none"></span>
+          </div>
+          <div class="load-list" id="load-list">
+            <div class="empty-state">No saved loads yet.<br>Enter your data in the Calculator tab and save it here.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RANGE CARD TAB -->
+  <div id="tab-rangecard" class="tab-content content">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="calculate();generateRangeCard()">Generate Card</button>
+      <button class="btn btn-secondary" onclick="printRangeCard()">🖨 Print</button>
+    </div>
+    <div id="range-card-container">
+      <div class="empty-state card">Calculate trajectory first, then generate your range card.</div>
+    </div>
+  </div>
+
+  <!-- ENVIRONMENT TAB -->
+  <div id="tab-environment" class="tab-content content">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-title">Atmospheric Conditions</div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Temperature</label>
+              <input type="number" id="temperature" value="59" min="-60" max="130">
+              <span class="unit">°F</span>
+            </div>
+            <div class="field">
+              <label>Altitude</label>
+              <input type="number" id="altitude" value="0" min="0" max="15000" step="100">
+              <span class="unit">feet above sea level</span>
+            </div>
+            <div class="field">
+              <label>Barometric Pressure</label>
+              <input type="number" id="pressure" value="29.92" step="0.01" min="25" max="32">
+              <span class="unit">inHg</span>
+            </div>
+            <div class="field">
+              <label>Humidity</label>
+              <input type="number" id="humidity" value="50" min="0" max="100">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="calcPressureFromAltitude()">↺ Auto from Altitude</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Wind</div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Wind Speed</label>
+              <input type="number" id="windSpeed" value="10" min="0" max="60">
+              <span class="unit">mph</span>
+            </div>
+            <div class="field">
+              <label>Wind Direction</label>
+              <select id="windDir">
+                <option value="90" selected>Full Value (90°)</option>
+                <option value="45">Half Value (45°)</option>
+                <option value="0">No Value (0°)</option>
+                <option value="custom">Custom angle...</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" id="customWindAngleField" style="display:none;margin-top:10px">
+            <label>Custom Angle (degrees, 0=head/tail, 90=full)</label>
+            <input type="number" id="customWindAngle" value="90" min="0" max="90">
+          </div>
+          <p class="tip" style="margin-top:10px">Wind direction is degrees from your line of fire. 90° = full crosswind.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Target / Incline</div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Shot Angle</label>
+              <input type="number" id="shotAngle" value="0" min="-60" max="60">
+              <span class="unit">degrees (+ uphill, – downhill)</span>
+            </div>
+            <div class="field">
+              <label>Latitude (Coriolis)</label>
+              <input type="number" id="latitude" value="45" min="-90" max="90">
+              <span class="unit">° (0=equator, 90=pole)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">Density Altitude</div>
+          <div id="da-display" style="font-size:32px;font-weight:900;color:var(--accent);margin:8px 0;font-variant-numeric:tabular-nums">—</div>
+          <div style="font-size:12px;color:var(--text-muted)">feet density altitude</div>
+          <hr>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.7" id="da-notes">
+            Enter conditions above to see density altitude. Higher DA = less air resistance = bullet flies flatter but wind effects change.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Air Density Factor</div>
+          <div id="adf-display" style="font-size:28px;font-weight:900;color:var(--accent);margin:8px 0;font-variant-numeric:tabular-nums">—</div>
+          <div style="font-size:12px;color:var(--text-muted)">relative to ICAO standard (1.0 = sea level, 59°F, 29.92 inHg)</div>
+          <hr>
+          <p class="tip">Values below 1.0 mean thinner air — your bullet will retain velocity better and drop less at distance.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Speed of Sound</div>
+          <div id="sos-display" style="font-size:28px;font-weight:900;color:var(--accent);margin:8px 0;font-variant-numeric:tabular-nums">—</div>
+          <div style="font-size:12px;color:var(--text-muted)">fps at current conditions</div>
+          <p class="tip" style="margin-top:8px">Transonic instability begins when your bullet slows below ~1.2× speed of sound.</p>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:4px">
+      <button class="btn btn-primary" onclick="calculate();updateEnvironmentDisplay()">Apply & Recalculate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────
+let savedLoads = JSON.parse(localStorage.getItem('ballisticLoads') || '[]');
+let lastResults = null;
+
+const PRESETS = [
+  { name: '6.5 Creedmoor 140gr Berger', notes: '6.5 CM', bulletWeight: 140, muzzleVelocity: 2710, bcType: 'G7', bc: 0.301, scopeHeight: 1.5, zeroRange: 100 },
+  { name: '.308 Win 175gr Sierra MK', notes: '.308 Win', bulletWeight: 175, muzzleVelocity: 2600, bcType: 'G7', bc: 0.264, scopeHeight: 1.5, zeroRange: 100 },
+  { name: '6mm Creedmoor 105gr Berger', notes: '6 CM', bulletWeight: 105, muzzleVelocity: 2960, bcType: 'G7', bc: 0.310, scopeHeight: 1.5, zeroRange: 100 },
+  { name: '.300 Win Mag 215gr Berger', notes: '.300 WM', bulletWeight: 215, muzzleVelocity: 2860, bcType: 'G7', bc: 0.368, scopeHeight: 1.5, zeroRange: 100 },
+  { name: '.338 Lapua 300gr Berger', notes: '.338 LM', bulletWeight: 300, muzzleVelocity: 2750, bcType: 'G7', bc: 0.417, scopeHeight: 1.75, zeroRange: 100 },
+  { name: '6.5 PRC 147gr ELD-M', notes: '6.5 PRC', bulletWeight: 147, muzzleVelocity: 2910, bcType: 'G7', bc: 0.315, scopeHeight: 1.5, zeroRange: 100 },
+];
+
+// ─── Physics constants ──────────────────────────────────────────────
+const G = 32.174;           // ft/s² gravity
+const rhoSL = 0.0765;       // lb/ft³ air density at sea level standard
+
+function getAirDensity() {
+  const T_F = +document.getElementById('temperature').value;
+  const P_inHg = +document.getElementById('pressure').value;
+  const RH = +document.getElementById('humidity').value / 100;
+  const T_R = (T_F + 459.67);
+  // Saturation vapor pressure (inHg)
+  const Psat = 0.01607 * Math.exp(0.0733 * T_F - 0.000133 * T_F * T_F);
+  const Pw = RH * Psat;
+  const Pd = P_inHg - Pw;
+  // Density in lb/ft³ using ideal gas
+  const rho = (0.0809 * Pd + 0.0477 * Pw) / (T_R / 518.67);
+  return rho;
+}
+
+function getDensityAltitude() {
+  const rho = getAirDensity();
+  // DA = 145442.16 * (1 - (rho/0.0765)^0.235)
+  const DA = 145442.16 * (1 - Math.pow(rho / rhoSL, 0.235));
+  return DA;
+}
+
+function getSpeedOfSound() {
+  const T_F = +document.getElementById('temperature').value;
+  const T_R = T_F + 459.67;
+  return Math.sqrt(1.4 * 1716.49 * T_R); // ft/s
+}
+
+// G1 and G7 drag functions (normalized retardation coefficient)
+// Using piecewise Mach-number lookup tables (simplified but accurate enough for practical use)
+const G1_TABLE = [
+  [0.0,0.2629],[0.05,0.2558],[0.1,0.2487],[0.15,0.2413],[0.2,0.2344],
+  [0.25,0.2278],[0.3,0.2214],[0.35,0.2155],[0.4,0.2096],[0.45,0.2042],
+  [0.5,0.1991],[0.55,0.1942],[0.6,0.1896],[0.65,0.1852],[0.7,0.1810],
+  [0.75,0.1774],[0.8,0.1739],[0.85,0.1700],[0.875,0.1700],[0.9,0.1695],
+  [0.925,0.1727],[0.95,0.1774],[0.975,0.1869],[1.0,0.2005],[1.025,0.2226],
+  [1.05,0.2432],[1.1,0.2663],[1.15,0.2848],[1.2,0.2982],[1.3,0.3140],
+  [1.4,0.3196],[1.5,0.3197],[1.6,0.3150],[1.8,0.2998],[2.0,0.2839],
+  [2.5,0.2554],[3.0,0.2313],[3.5,0.2165],[4.0,0.2048],[4.5,0.1956],
+  [5.0,0.1869]
+];
+
+const G7_TABLE = [
+  [0.0,0.1198],[0.05,0.1197],[0.1,0.1196],[0.15,0.1194],[0.2,0.1193],
+  [0.25,0.1194],[0.3,0.1194],[0.35,0.1194],[0.4,0.1193],[0.45,0.1193],
+  [0.5,0.1194],[0.55,0.1193],[0.6,0.1194],[0.65,0.1197],[0.7,0.1202],
+  [0.725,0.1207],[0.75,0.1215],[0.775,0.1226],[0.8,0.1242],[0.825,0.1266],
+  [0.85,0.1306],[0.875,0.1368],[0.9,0.1464],[0.925,0.1660],[0.95,0.2054],
+  [0.975,0.2993],[1.0,0.3803],[1.025,0.4015],[1.05,0.4043],[1.075,0.4034],
+  [1.1,0.4014],[1.125,0.3987],[1.15,0.3955],[1.2,0.3884],[1.25,0.3810],
+  [1.3,0.3732],[1.35,0.3657],[1.4,0.3580],[1.5,0.3440],[1.55,0.3376],
+  [1.6,0.3315],[1.65,0.3260],[1.7,0.3209],[1.75,0.3160],[1.8,0.3115],
+  [1.85,0.3073],[1.9,0.3033],[1.95,0.2994],[2.0,0.2958],[2.05,0.2922],
+  [2.1,0.2888],[2.15,0.2855],[2.2,0.2823],[2.25,0.2793],[2.3,0.2764],
+  [2.35,0.2736],[2.4,0.2709],[2.45,0.2683],[2.5,0.2658],[2.6,0.2609],
+  [2.7,0.2562],[2.8,0.2517],[2.9,0.2474],[3.0,0.2432],[3.1,0.2391],
+  [3.2,0.2351],[3.3,0.2313],[3.4,0.2276],[3.5,0.2240],[3.6,0.2205],
+  [3.7,0.2171],[3.8,0.2138],[3.9,0.2105],[4.0,0.2075],[4.2,0.2014],
+  [4.4,0.1956],[4.6,0.1900],[4.8,0.1848],[5.0,0.1798]
+];
+
+function dragCoeff(mach, table) {
+  if (mach <= table[0][0]) return table[0][1];
+  if (mach >= table[table.length-1][0]) return table[table.length-1][1];
+  for (let i = 0; i < table.length - 1; i++) {
+    if (mach >= table[i][0] && mach <= table[i+1][0]) {
+      const t = (mach - table[i][0]) / (table[i+1][0] - table[i][0]);
+      return table[i][1] + t * (table[i+1][1] - table[i][0+1]);
+    }
+  }
+  return table[table.length-1][1];
+}
+
+function dragRetardation(v, bcVal, bcType, rho, sos) {
+  const mach = v / sos;
+  const table = bcType === 'G7' ? G7_TABLE : G1_TABLE;
+  const Cd = dragCoeff(mach, table);
+  // Retardation: a = (rho/rhoSL) * (Cd/BC) * v²  — simplified form
+  // Full: a = (ρ/ρ_sl) * (1/BC) * CD(M) * v²
+  const rhoRatio = rho / rhoSL;
+  return rhoRatio * (1.0 / bcVal) * Cd * v * v;
+}
+
+// Main trajectory integrator (4th-order Runge-Kutta, 1ms steps)
+function runTrajectory(params) {
+  const {
+    bulletWeight, muzzleVelocity, bcType, bc,
+    scopeHeight, zeroRange,
+    maxRange, step,
+    windSpeed_fps, windAngle_deg,
+    shotAngle_deg, rho, sos
+  } = params;
+
+  const windAngle_rad = windAngle_deg * Math.PI / 180;
+  const shotAngle_rad = shotAngle_deg * Math.PI / 180;
+
+  // We work in feet. Convert yards to feet for integration.
+  const zeroRangeFt = zeroRange * 3;
+  const maxRangeFt = maxRange * 3;
+
+  // Velocity components (fps)
+  // Bore angle will be solved iteratively for zero
+  // First pass: find bore angle for zero
+  let boreAngle = 0;
+  for (let iter = 0; iter < 30; iter++) {
+    const r = integrate(muzzleVelocity, boreAngle, shotAngle_rad, bc, bcType, scopeHeight, windSpeed_fps, windAngle_rad, rho, sos, zeroRangeFt);
+    // Adjust boreAngle so bullet passes through zero
+    const dropAtZero = r.y; // inches above/below LoS
+    boreAngle += dropAtZero / (zeroRangeFt * 12) * 0.5; // small correction
+    if (Math.abs(dropAtZero) < 0.001) break;
+  }
+
+  // Full integration at output steps
+  const results = [];
+  let tof = 0, x = 0, y_ft = scopeHeight / 12, z_ft = 0;
+  let vx = muzzleVelocity * Math.cos(boreAngle + shotAngle_rad);
+  let vy = muzzleVelocity * Math.sin(boreAngle + shotAngle_rad);
+  let vz = 0;
+  let prevX = 0;
+
+  const dt = 0.0005; // 0.5ms timestep
+  let nextOutput = 0;
+
+  const outputs = [];
+  for (let yds = 0; yds <= maxRange; yds += step) outputs.push(yds);
+
+  let outputIdx = 0;
+
+  for (let i = 0; i < 500000 && outputIdx < outputs.length; i++) {
+    const xFt = x;
+
+    // Output at requested ranges
+    while (outputIdx < outputs.length && x >= outputs[outputIdx] * 3) {
+      const range_yd = outputs[outputIdx];
+      const range_ft = range_yd * 3;
+      const v = Math.sqrt(vx*vx + vy*vy + vz*vz);
+      // LoS height at this range (accounting for shot angle)
+      const losHeight_ft = -(scopeHeight / 12) + range_ft * Math.tan(shotAngle_rad);
+      const drop_in = (y_ft - losHeight_ft) * 12; // inches from LoS
+      const wind_in = z_ft * 12; // inches of windage
+      const energy = (bulletWeight * v * v) / 450437;
+      results.push({ range: range_yd, drop_in, wind_in, velocity: v, energy, tof });
+      outputIdx++;
+    }
+
+    if (outputIdx >= outputs.length) break;
+
+    // Physics
+    const v = Math.sqrt(vx*vx + vy*vy + vz*vz);
+    const mach = v / sos;
+    const ret = dragRetardation(v, bc, bcType, rho, sos);
+    const ax = -ret * vx / v;
+    const ay = -G - ret * vy / v;
+    const az = -ret * (vz - windSpeed_fps * Math.sin(windAngle_rad)) / v;
+
+    vx += ax * dt;
+    vy += ay * dt;
+    vz += az * dt + windSpeed_fps * Math.sin(windAngle_rad) * dt * 0;
+    x += vx * dt;
+    y_ft += vy * dt;
+    z_ft += vz * dt;
+    tof += dt;
+  }
+
+  return results;
+}
+
+function integrate(mv, boreAngle, shotAngle_rad, bc, bcType, scopeHeight, windSpeed_fps, windAngle_rad, rho, sos, targetX_ft) {
+  let x = 0, y = scopeHeight / 12, vx = mv * Math.cos(boreAngle + shotAngle_rad), vy = mv * Math.sin(boreAngle + shotAngle_rad), vz = 0;
+  const dt = 0.001;
+  for (let i = 0; i < 200000 && x < targetX_ft; i++) {
+    const v = Math.sqrt(vx*vx + vy*vy + vz*vz);
+    const ret = dragRetardation(v, bc, bcType, rho, sos);
+    vx += (-ret * vx / v) * dt;
+    vy += (-G - ret * vy / v) * dt;
+    x += vx * dt;
+    y += vy * dt;
+  }
+  const losAtTarget = -(scopeHeight / 12) + targetX_ft * Math.tan(shotAngle_rad);
+  return { y: (y - losAtTarget) * 12 };
+}
+
+// ─── Unit converters ──────────────────────────────────────────────
+function inchesToMOA(inches, yards) {
+  return inches / (yards * 1.0472 / 100);
+}
+function inchesToMil(inches, yards) {
+  return inches / (yards * 3.6 / 100);
+}
+function convertDrop(inches, yards, unit) {
+  if (unit === 'inches') return inches.toFixed(1) + '"';
+  if (unit === 'moa') return inchesToMOA(inches, yards).toFixed(2) + ' MOA';
+  if (unit === 'mil') return inchesToMil(inches, yards).toFixed(2) + ' mil';
+}
+
+// ─── Calculate ────────────────────────────────────────────────────
+function calculate() {
+  const bulletWeight = +document.getElementById('bulletWeight').value;
+  const muzzleVelocity = +document.getElementById('muzzleVelocity').value;
+  const bcType = document.getElementById('bcType').value;
+  const bc = +document.getElementById('bc').value;
+  const scopeHeight = +document.getElementById('scopeHeight').value;
+  const zeroRange = +document.getElementById('zeroRange').value;
+  const maxRange = +document.getElementById('maxRange').value;
+  const step = +document.getElementById('rangeStep').value;
+  const dropUnits = document.getElementById('dropUnits').value;
+  const windUnits = document.getElementById('windUnits').value;
+
+  const temperature = +document.getElementById('temperature').value;
+  const windSpeed = +document.getElementById('windSpeed').value;
+  const windDirVal = document.getElementById('windDir').value;
+  const shotAngle = +document.getElementById('shotAngle').value;
+
+  let windAngle = windDirVal === 'custom'
+    ? +document.getElementById('customWindAngle').value
+    : +windDirVal;
+
+  const windSpeed_fps = windSpeed * 1.4667; // mph to fps
+  const rho = getAirDensity();
+  const sos = getSpeedOfSound();
+
+  const results = runTrajectory({
+    bulletWeight, muzzleVelocity, bcType, bc,
+    scopeHeight, zeroRange,
+    maxRange, step,
+    windSpeed_fps,
+    windAngle_deg: windAngle,
+    shotAngle_deg: shotAngle,
+    rho, sos
+  });
+
+  lastResults = { results, dropUnits, windUnits, bulletWeight, muzzleVelocity, bcType, bc, scopeHeight, zeroRange, windSpeed, windAngle };
+
+  // Summary chips
+  const mv = results[0]?.velocity || muzzleVelocity;
+  const at500 = results.find(r => r.range === 500) || results.find(r => r.range >= 500);
+  const at1000 = results.find(r => r.range === 1000) || results.find(r => r.range >= 1000);
+
+  document.getElementById('summary-chips').innerHTML = `
+    <div class="chip">MV <span>${muzzleVelocity} fps</span></div>
+    <div class="chip">BC ${bcType} <span>${bc}</span></div>
+    <div class="chip">Zero <span>${zeroRange} yds</span></div>
+    ${at500 ? `<div class="chip">500yd Drop <span>${convertDrop(at500.drop_in, 500, dropUnits)}</span></div>` : ''}
+    ${at1000 ? `<div class="chip">1000yd Vel <span>${Math.round(at1000.velocity)} fps</span></div>` : ''}
+  `;
+
+  // Table
+  const body = document.getElementById('results-body');
+  body.innerHTML = results.map(r => {
+    const isZero = r.range === zeroRange;
+    const dropStr = r.range === 0 ? '—' : convertDrop(r.drop_in, r.range, dropUnits);
+    const windStr = r.range === 0 ? '—' : convertDrop(r.wind_in, r.range, windUnits);
+    const dropNeg = r.drop_in < -0.1 && r.range > 0;
+    return `<tr class="${isZero ? 'zero-row' : ''}">
+      <td>${r.range} yd${isZero ? ' ★' : ''}</td>
+      <td class="${dropNeg ? 'negative' : ''}">${dropStr}</td>
+      <td>${windStr}</td>
+      <td>${Math.round(r.velocity)} fps</td>
+      <td>${Math.round(r.energy)} ft-lb</td>
+      <td>${r.tof.toFixed(3)}s</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('results-card').style.display = '';
+  document.getElementById('no-results-card').style.display = 'none';
+  updateEnvironmentDisplay();
+}
+
+// ─── Environment tab ──────────────────────────────────────────────
+function updateEnvironmentDisplay() {
+  const da = Math.round(getDensityAltitude());
+  const sos = Math.round(getSpeedOfSound());
+  const rho = getAirDensity();
+  const adf = (rho / rhoSL).toFixed(3);
+
+  document.getElementById('da-display').textContent = da.toLocaleString();
+  document.getElementById('sos-display').textContent = sos.toLocaleString();
+  document.getElementById('adf-display').textContent = adf;
+
+  const T_F = +document.getElementById('temperature').value;
+  const alt = +document.getElementById('altitude').value;
+  document.getElementById('da-notes').innerHTML = `
+    Temperature: <strong>${T_F}°F</strong> · Altitude: <strong>${alt.toLocaleString()} ft</strong><br>
+    Density altitude <strong>${da.toLocaleString()} ft</strong> — ${da > 5000 ? 'High DA: expect flatter trajectory' : da > 2000 ? 'Moderate DA: slight trajectory improvement' : 'Low DA: near standard conditions'}.
+  `;
+}
+
+function calcPressureFromAltitude() {
+  const alt = +document.getElementById('altitude').value;
+  const pressure = 29.92 * Math.pow(1 - 0.0000068756 * alt, 5.2561);
+  document.getElementById('pressure').value = pressure.toFixed(2);
+  updateEnvironmentDisplay();
+}
+
+document.getElementById('windDir').addEventListener('change', function() {
+  document.getElementById('customWindAngleField').style.display = this.value === 'custom' ? '' : 'none';
+});
+
+['temperature','pressure','humidity','altitude','windSpeed'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateEnvironmentDisplay);
+});
+
+// ─── Range card ────────────────────────────────────────────────────
+function generateRangeCard() {
+  if (!lastResults) { calculate(); }
+  const { results, dropUnits, windUnits, bulletWeight, muzzleVelocity, bcType, bc, scopeHeight, zeroRange, windSpeed, windAngle } = lastResults;
+  const du = dropUnits;
+  const wu = windUnits;
+
+  const rows = results.map(r => {
+    const isZero = r.range === zeroRange;
+    const dropStr = r.range === 0 ? '0.0' : convertDrop(r.drop_in, r.range, du);
+    const windStr = r.range === 0 ? '0.0' : convertDrop(r.wind_in, r.range, wu);
+    return `<tr${isZero ? ' style="background:#e8f5e9"' : ''}>
+      <td>${r.range}${isZero ? ' ★' : ''}</td>
+      <td>${dropStr}</td>
+      <td>${windStr}</td>
+      <td>${Math.round(r.velocity)}</td>
+      <td>${Math.round(r.energy)}</td>
+    </tr>`;
+  }).join('');
+
+  const today = new Date().toLocaleDateString();
+  const temp = document.getElementById('temperature').value;
+  const alt = document.getElementById('altitude').value;
+  const da = Math.round(getDensityAltitude());
+
+  document.getElementById('range-card-container').innerHTML = `
+    <div class="range-card">
+      <h2>DOPE CARD</h2>
+      <div class="rc-meta">
+        ${bulletWeight}gr · ${bcType} BC ${bc} · MV ${muzzleVelocity} fps · Zero: ${zeroRange} yd · Height: ${scopeHeight}"<br>
+        Wind: ${windSpeed} mph @ ${windAngle}° · Temp: ${temp}°F · Alt: ${(+alt).toLocaleString()} ft · DA: ${da.toLocaleString()} ft<br>
+        Drop units: ${du.toUpperCase()} · Wind units: ${wu.toUpperCase()} · Generated: ${today}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>RANGE (yd)</th>
+            <th>DROP (${du})</th>
+            <th>WIND (${wu})</th>
+            <th>VEL (fps)</th>
+            <th>ENERGY (ft·lb)</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function printRangeCard() {
+  generate();
+  window.print();
+}
+
+// ─── Load library ──────────────────────────────────────────────────
+function renderLoads() {
+  const list = document.getElementById('load-list');
+  if (savedLoads.length === 0) {
+    list.innerHTML = '<div class="empty-state">No saved loads yet.<br>Enter your data in the Calculator tab and save it here.</div>';
+    document.getElementById('load-count').style.display = 'none';
+  } else {
+    document.getElementById('load-count').style.display = '';
+    document.getElementById('load-count').textContent = savedLoads.length;
+    list.innerHTML = savedLoads.map((l, i) => `
+      <div class="load-item" onclick="loadLoad(${i})">
+        <div>
+          <div class="load-name">${l.name}</div>
+          <div class="load-meta">${l.notes || ''} · ${l.bulletWeight}gr · ${l.muzzleVelocity} fps · ${l.bcType} ${l.bc}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteLoad(${i})">✕</button>
+      </div>
+    `).join('');
+  }
+
+  // Presets
+  document.getElementById('preset-list').innerHTML = PRESETS.map((l, i) => `
+    <div class="load-item" onclick="loadPreset(${i})">
+      <div>
+        <div class="load-name">${l.name}</div>
+        <div class="load-meta">${l.bulletWeight}gr · ${l.muzzleVelocity} fps · ${l.bcType} ${l.bc}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function saveLoad() {
+  const name = document.getElementById('loadName').value.trim();
+  if (!name) { alert('Enter a load name first.'); return; }
+  savedLoads.push({
+    name,
+    notes: document.getElementById('loadNotes').value.trim(),
+    bulletWeight: +document.getElementById('bulletWeight').value,
+    muzzleVelocity: +document.getElementById('muzzleVelocity').value,
+    bcType: document.getElementById('bcType').value,
+    bc: +document.getElementById('bc').value,
+    scopeHeight: +document.getElementById('scopeHeight').value,
+    zeroRange: +document.getElementById('zeroRange').value,
+  });
+  localStorage.setItem('ballisticLoads', JSON.stringify(savedLoads));
+  document.getElementById('loadName').value = '';
+  document.getElementById('loadNotes').value = '';
+  renderLoads();
+}
+
+function loadLoad(i) {
+  applyLoad(savedLoads[i]);
+  document.getElementById('active-load-badge').textContent = savedLoads[i].name;
+  document.getElementById('active-load-badge').style.display = '';
+  showTab('calc');
+}
+
+function loadPreset(i) {
+  applyLoad(PRESETS[i]);
+  document.getElementById('active-load-badge').textContent = PRESETS[i].name;
+  document.getElementById('active-load-badge').style.display = '';
+  showTab('calc');
+}
+
+function applyLoad(l) {
+  document.getElementById('bulletWeight').value = l.bulletWeight;
+  document.getElementById('muzzleVelocity').value = l.muzzleVelocity;
+  document.getElementById('bcType').value = l.bcType;
+  document.getElementById('bc').value = l.bc;
+  document.getElementById('scopeHeight').value = l.scopeHeight;
+  document.getElementById('zeroRange').value = l.zeroRange;
+  // Update BC label
+  document.querySelector('#bc + .unit').textContent = l.bcType + ' BC';
+}
+
+function deleteLoad(i) {
+  if (!confirm('Delete this load?')) return;
+  savedLoads.splice(i, 1);
+  localStorage.setItem('ballisticLoads', JSON.stringify(savedLoads));
+  renderLoads();
+}
+
+// BC type label update
+document.getElementById('bcType').addEventListener('change', function() {
+  document.querySelector('#bc + .unit').textContent = this.value + ' BC';
+});
+
+// ─── Tab navigation ──────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const tabs = { calc: 0, loads: 1, rangecard: 2, environment: 3 };
+  document.querySelectorAll('.tab')[tabs[name]].classList.add('active');
+  if (name === 'loads') renderLoads();
+  if (name === 'environment') updateEnvironmentDisplay();
+  if (name === 'rangecard' && lastResults) generateRangeCard();
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+renderLoads();
+updateEnvironmentDisplay();
+calculate(); // run initial calc on load
+</script>
+</body>
+</html>
