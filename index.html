@@ -115,12 +115,16 @@
     .actions-row { flex-direction: column; }
     .actions-row .btn { width: 100%; }
 
-    /* Table: horizontal scroll */
-    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-    .results-table { min-width: 460px; }
-    .results-table td, .results-table th { padding: 9px 8px; }
+    /* Table: force fit — no horizontal scroll */
+    .table-scroll { overflow-x: visible; }
+    .results-table { min-width: unset; width: 100%; table-layout: fixed; }
+    .results-table td, .results-table th { padding: 7px 3px; font-size: 11px; }
+    .results-table th { font-size: 9px; letter-spacing: 0; }
+    /* Hide TOF column (6th) on mobile */
+    .results-table th:nth-child(6),
+    .results-table td:nth-child(6) { display: none; }
 
-    .card { padding: 14px 12px; }
+    .card { padding: 12px 8px; }
     .section-header { flex-wrap: wrap; gap: 8px; }
     .chips { gap: 6px; }
 
@@ -460,11 +464,11 @@
             <table class="results-table" id="results-table">
               <thead>
                 <tr>
-                  <th>Range</th>
+                  <th>YD</th>
                   <th>Drop</th>
                   <th>Wind</th>
-                  <th>Velocity</th>
-                  <th>Energy</th>
+                  <th>FPS</th>
+                  <th>FT-LB</th>
                   <th>TOF</th>
                 </tr>
               </thead>
@@ -916,11 +920,11 @@ function calculate() {
     const windStr = r.range === 0 ? '—' : convertDrop(r.wind_in, r.range, windUnits);
     const dropNeg = r.drop_in < -0.1 && r.range > 0;
     return `<tr class="${isZero ? 'zero-row' : ''}">
-      <td>${r.range} yd${isZero ? ' ★' : ''}</td>
+      <td>${r.range}${isZero ? ' ★' : ''}</td>
       <td class="${dropNeg ? 'negative' : ''}">${dropStr}</td>
       <td>${windStr}</td>
-      <td>${Math.round(r.velocity)} fps</td>
-      <td>${Math.round(r.energy)} ft-lb</td>
+      <td>${Math.round(r.velocity)}</td>
+      <td>${Math.round(r.energy)}</td>
       <td>${r.tof.toFixed(3)}s</td>
     </tr>`;
   }).join('');
