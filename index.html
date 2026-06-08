@@ -116,12 +116,24 @@
 
     /* Table: horizontal scroll */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-    .results-table { min-width: 520px; }
+    .results-table { min-width: 460px; }
     .results-table td, .results-table th { padding: 9px 8px; }
 
     .card { padding: 14px 12px; }
     .section-header { flex-wrap: wrap; gap: 8px; }
     .chips { gap: 6px; }
+
+    /* Range card: contain table overflow and tighten spacing */
+    .range-card { padding: 12px; overflow-x: hidden; }
+    .range-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+    .range-card table { font-size: 10px; min-width: 440px; }
+    .range-card th { padding: 4px 5px; font-size: 9px; }
+    .range-card td { padding: 3px 5px; }
+    .range-card h2 { font-size: 14px; }
+    .range-card .rc-meta { font-size: 10px; }
+
+    /* Prevent any element from causing horizontal page scroll */
+    body { overflow-x: hidden; }
   }
 
   /* Cards */
@@ -1001,20 +1013,22 @@ function generateRangeCard() {
         Wind: ${windSpeed} mph @ ${windAngle}° · Temp: ${temp}°F · Alt: ${(+alt).toLocaleString()} ft · DA: ${da.toLocaleString()} ft<br>
         Drop clicks: ¼ MOA &amp; 0.1 mil · Wind clicks: ¼ MOA &amp; 0.1 mil · Generated: ${today}
       </div>
+      <div class="range-card-scroll">
       <table>
         <thead>
           <tr>
             <th>RANGE</th>
-            <th>ELEVATION<br>CLICKS (¼ MOA)</th>
-            <th>ELEVATION<br>CLICKS (0.1 MIL)</th>
-            <th>WIND<br>(¼ MOA)</th>
-            <th>WIND<br>(0.1 MIL)</th>
-            <th>VEL fps</th>
-            <th>ENERGY</th>
+            <th>ELEV<br>(¼MOA)</th>
+            <th>ELEV<br>(MIL)</th>
+            <th>WIND<br>(¼MOA)</th>
+            <th>WIND<br>(MIL)</th>
+            <th>FPS</th>
+            <th>FT-LB</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      </div>
     </div>
   `;
 }
