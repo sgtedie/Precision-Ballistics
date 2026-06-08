@@ -983,23 +983,24 @@ function generateRangeCard() {
     return Math.round(inchesToMil(inches, yards) * 10); // 0.1 mil clicks
   }
 
+  const useMIL = dropUnits === 'mil';
+  const elevLabel = useMIL ? 'ELEV<br>(0.1 MIL)' : 'ELEV<br>(¼ MOA)';
+  const windLabel = useMIL ? 'WIND<br>(0.1 MIL)' : 'WIND<br>(¼ MOA)';
+  const clickLabel = useMIL ? '0.1 mil per click' : '¼ MOA per click';
+
   const rows = results.map(r => {
     const isZero = r.range === zeroRange;
-    const dropMOA  = r.range === 0 ? '0' : clicksMOA(-r.drop_in, r.range);
-    const dropMIL  = r.range === 0 ? '0' : clicksMIL(-r.drop_in, r.range);
-    const windMOA  = r.range === 0 ? '0' : clicksMOA(Math.abs(r.wind_in), r.range);
-    const windMIL  = r.range === 0 ? '0' : clicksMIL(Math.abs(r.wind_in), r.range);
-    const windDir  = r.wind_in >= 0 ? '→' : '←';
-    // Elevation direction: bullet below LOS = dial UP; bullet above LOS (near/before zero) = dial DOWN
-    const elevDir  = r.drop_in < -0.05 ? '↑ ' : r.drop_in > 0.05 ? '↓ ' : '';
-    const elevMOA  = r.range === 0 ? '0' : elevDir + dropMOA;
-    const elevMIL  = r.range === 0 ? '0' : elevDir + dropMIL;
+    const windDir = r.wind_in >= 0 ? '→' : '←';
+    const elevDir = r.drop_in < -0.05 ? '↑ ' : r.drop_in > 0.05 ? '↓ ' : '';
+    const elevClicks = r.range === 0 ? '0'
+      : elevDir + (useMIL ? clicksMIL(-r.drop_in, r.range) : clicksMOA(-r.drop_in, r.range));
+    const windClicks = r.range > 0 && Math.abs(r.wind_in) > 0.05
+      ? windDir + (useMIL ? clicksMIL(Math.abs(r.wind_in), r.range) : clicksMOA(Math.abs(r.wind_in), r.range))
+      : '0';
     return `<tr${isZero ? ' style="background:#e8f5e9"' : ''}>
       <td>${r.range}${isZero ? ' ★' : ''}</td>
-      <td>${elevMOA}</td>
-      <td>${elevMIL}</td>
-      <td>${r.range > 0 && Math.abs(r.wind_in) > 0.05 ? windDir + windMOA : '0'}</td>
-      <td>${r.range > 0 && Math.abs(r.wind_in) > 0.05 ? windDir + windMIL : '0'}</td>
+      <td>${elevClicks}</td>
+      <td>${windClicks}</td>
       <td>${Math.round(r.velocity)}</td>
       <td>${Math.round(r.energy)}</td>
     </tr>`;
@@ -1016,17 +1017,15 @@ function generateRangeCard() {
       <div class="rc-meta">
         ${bulletWeight}gr · ${bcType} BC ${bc} · MV ${muzzleVelocity} fps · Zero: ${zeroRange} yd · Scope: ${scopeHeight}" high<br>
         Wind: ${windSpeed} mph @ ${windAngle}° · Temp: ${temp}°F · Alt: ${(+alt).toLocaleString()} ft · DA: ${da.toLocaleString()} ft<br>
-        Drop clicks: ¼ MOA &amp; 0.1 mil · Wind clicks: ¼ MOA &amp; 0.1 mil · Generated: ${today}
+        Clicks: ${clickLabel} · Generated: ${today}
       </div>
       <div class="range-card-scroll">
       <table>
         <thead>
           <tr>
             <th>RANGE</th>
-            <th>ELEV<br>(¼MOA)</th>
-            <th>ELEV<br>(MIL)</th>
-            <th>WIND<br>(¼MOA)</th>
-            <th>WIND<br>(MIL)</th>
+            <th>${elevLabel}</th>
+            <th>${windLabel}</th>
             <th>FPS</th>
             <th>FT-LB</th>
           </tr>
